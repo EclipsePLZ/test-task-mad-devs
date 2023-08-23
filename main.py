@@ -2,44 +2,49 @@ import json
 import logging
 import time
 import websocket
-import threading
+import asyncio
+from collections import deque
+from binance.websocket.spot.websocket_api import SpotWebsocketAPIClient
+
+MAX_KLINES = 14
+
+TIME_BINANCE = 300
 
 
-def on_message(ws, message):
+def message_handler(_, message):
     data = json.loads(message)
-    if 'k' in data and data['k']['c'] != '0':
-        kline_data = data['k']
-        print('Binance:')
-        print('Open time:', kline_data['t'])
-        print()
+    klines = data['result']
+    print(klines)
+    print(klines[:-1])
+
 
 def on_error(ws, error):
     print('Error:', error)
 
 
-def on_close(ws, close_status_code, close_msg):
-    print('Closed:', close_status_code, close_msg)
+def on_close(_):
+    print("Do custom stuff when connection is closed")
 
 
-def on_open(ws):
-    payload = {
-        'method': 'SUBSCRIBE',
-        'params': [
-            'btcusdt@kline_1s'
-        ],
-        'id': 1
-    }
-    ws.send(json.dumps(payload))
+async def start_binance():
+    my_client = SpotWebsocketAPIClient(on_message=message_handler,
+                                       on_close=on_close)
+    while True:
+        my_client.klines(symbol="BTCUSDT", interval="1m", limit=MAX_KLINES+1)
+        time.sleep(10)
 
 
-def message_handler(_, message):
-    print(message)
-
-
-def get_binance():
-    websocket.enableTrace(True)
-    ws = websocket.WebSocketApp('wss://stream.binance.com:9443/ws/btcusdt@kline_1s', on_message=on)
+def start_tasks():
+    loop = asyncio.get_event_loop()
+    tasks = [loop.create_task(start_binance())]
+    try:
+        loop.run_forever()
+    except KeyboardInterrupt:
+        print('Manually closed application')
+    finally:
+        loop.close()
+        print('App is closed')
 
 
 if __name__ == '__main__':
-    get_binance()
+    start_tasks()
