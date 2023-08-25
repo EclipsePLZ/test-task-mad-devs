@@ -1,12 +1,10 @@
 import json
-import logging
 import time
-import websocket
 import asyncio
-from collections import deque
 from binance.websocket.spot.websocket_api import SpotWebsocketAPIClient
 import pandas_ta as pta
 import pandas as pd
+import datetime
 
 
 MAX_KLINES = 14
@@ -20,11 +18,14 @@ def message_handler(_, message):
 
     # The closing price is at position 4
     # To get completely closed candles we remove the last candle
+    # To calculate RSI with length = 14, we need 15 candles
     klines_close_prices = [float(kline_info[4]) for kline_info in data['result'][:-1]]
-    rsi_index = pta.rsi(close=pd.Series(klines_close_prices), length=14)
+    rsi_index = pta.rsi(close=pd.Series(klines_close_prices), length=14).values[-1]
 
-    print(rsi_index)
-    print(klines_close_prices)
+    print('Binance:')
+    print(f'Time: {datetime.datetime.now()}')
+    print(f'RSI ({CURRENCY_PAIR_BINANCE}): {rsi_index}')
+    print()
 
 
 def on_error(ws, error):
@@ -39,8 +40,8 @@ async def start_binance():
     my_client = SpotWebsocketAPIClient(on_message=message_handler,
                                        on_close=on_close)
     while True:
-        my_client.klines(symbol=CURRENCY_PAIR_BINANCE, interval=INTERVAL_BINANCE, limit=MAX_KLINES + 1)
-        time.sleep(10)
+        my_client.klines(symbol=CURRENCY_PAIR_BINANCE, interval=INTERVAL_BINANCE, limit=MAX_KLINES + 2)
+        time.sleep(TIME_BINANCE)
 
 
 def start_tasks():
